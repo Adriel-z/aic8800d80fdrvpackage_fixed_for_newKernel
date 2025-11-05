@@ -6,8 +6,8 @@ Aic8800(UX9H免驱版|AX900)：
 
 说明：
 该型号的驱动文件包aic8800d80fdrvpackage原来是只支持到内核6.8,但是在新内核上用不了。因此我修改了两个文件：
-/ax900_6/aic8800_linux_drvier/drivers/aic8800/aic8800_fdrv/rwnx_radar.c
-/ax900_6/aic8800_linux_drvier/drivers/aic8800/aic_load_fw/aicwf_rx_prealloc.c
+/aic8800_linux_drvier/drivers/aic8800/aic8800_fdrv/rwnx_radar.c
+/aic8800_linux_drvier/drivers/aic8800/aic_load_fw/aicwf_rx_prealloc.c
 
 第一个文件是修改了两个函数。如果想了解我具体修改了什么，可以对比原来的代码。我会把原来的源码附上。
 第二个文件是在最后那里增加了符号导出。
