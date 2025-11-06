@@ -1,0 +1,94 @@
+1，重启之后wifi界面消失，但是使用ip link show检查设备接口正常。
+这是因为模块没有随系统启动。解决方法：
+
+1,卸载旧模块
+sudo rmmod aic8800_fdrv 2>/dev/null || true
+sudo rmmod aic_load_fw 2>/dev/null || true
+
+2,进入源码目录重新执行
+sudo insmod aic_load_fw/aic_load_fw.ko
+sudo insmod aic8800_fdrv/aic8800_fdrv.ko
+
+3.检查是否成功
+sudo lsmod | grep aic
+
+如果提示符号问题：
+sudo dmesg | grep "Unknown symbol" | tail -5
+解决方法是：
+cd aic_load_fw
+grep -rn "aicwf_rxbuff_size_get\|get_flash_bin_size\|get_flash_bin_crc\|aicwf_prealloc_rxbuff_alloc\|aicwf_prealloc_rxbuff_free" .
+然后在对应的源码文件中增加：
+EXPORT_SYMBOL(aicwf_rxbuff_size_get);
+EXPORT_SYMBOL(get_flash_bin_size);
+EXPORT_SYMBOL(get_flash_bin_crc);
+EXPORT_SYMBOL(aicwf_prealloc_rxbuff_alloc);
+EXPORT_SYMBOL(aicwf_prealloc_rxbuff_free);
+然后重新编译安装即可！
+
+关于模块没有随系统启动的解决方法：
+# 创建加载脚本
+sudo tee /usr/local/bin/load_aic_wifi.sh > /dev/null << 'EOF'
+#!/bin/bash
+
+# 等待系统基本服务启动
+sleep 3
+
+# 切换到驱动目录
+cd /aic8800_linux_drvier/drivers/aic8800
+
+# 卸载旧模块
+/sbin/rmmod aic8800_fdrv 2>/dev/null
+/sbin/rmmod aic_load_fw 2>/dev/null
+
+# 加载模块
+/sbin/insmod aic_load_fw/aic_load_fw.ko
+/sbin/insmod aic8800_fdrv/aic8800_fdrv.ko
+
+# 检查并通知
+if lsmod | grep -q aic8800_fdrv; then
+    echo "AIC8800 WiFi drivers loaded successfully"
+    # 可选：重启 NetworkManager 来识别新接口
+    systemctl restart NetworkManager 2>/dev/null || true
+else
+    echo "Failed to load AIC8800 drivers"
+    exit 1
+fi
+EOF
+
+sudo chmod +x /usr/local/bin/load_aic_wifi.sh
+
+创建 systemd 服务
+sudo tee /etc/systemd/system/aic8800-wifi.service > /dev/null << 'EOF'
+[Unit]
+Description=Load AIC8800 WiFi Drivers
+After=network.target
+Wants=network.target
+
+[Service]
+Type=oneshot
+ExecStart=/usr/local/bin/load_aic_wifi.sh
+RemainAfterExit=yes
+User=root
+TimeoutSec=30
+
+[Install]
+WantedBy=multi-user.target
+EOF
+
+启用服务
+sudo systemctl daemon-reload
+sudo systemctl enable aic8800-wifi.service
+sudo systemctl start aic8800-wifi.service
+sudo systemctl status aic8800-wifi.service
+
+创建桌面快捷方式（可选）
+tee ~/Desktop/load_wifi_drivers.sh << 'EOF'
+#!/bin/bash
+echo "Loading AIC8800 WiFi drivers..."
+pkexec /usr/local/bin/load_aic_wifi.sh
+echo "Drivers loaded. Check your WiFi settings."
+EOF
+
+chmod +x ~/Desktop/load_wifi_drivers.sh
+
+如有问题，请反馈！
